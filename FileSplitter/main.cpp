@@ -61,6 +61,15 @@ void JoinFiles(std::string firstFile)
 			if (extracted < 1) break;
 
 			outFile.write((char*)&data[0], extracted);
+			
+			if (outFile.fail())
+			{
+				//Probably ran out of space
+				std::cout << "Error writing to file " << fileNames[0] << ".\nMaybe disk is full?\n";
+				outFile.close();
+				inFile.close();
+				exit(-10);
+			}
 		}
 
 		inFile.close();		
@@ -127,6 +136,16 @@ void SplitFile(std::string fileName, size_t fileSize = 3500)
 			}
 
 			outFile.write((char*)&data[0], extracted);
+
+			if (outFile.fail())
+			{
+				//Probably ran out of space
+				std::cout << "Error writing to file " << outFileName << ".\nMaybe disk is full?\n";
+				outFile.close();
+				inFile.close();
+				ripFile.close();
+				exit(-10);
+			}
 
 			totalWritten += extracted;
 			if (totalWritten >= fileSize) break;
