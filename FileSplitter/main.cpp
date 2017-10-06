@@ -69,8 +69,9 @@ void JoinFiles(std::string firstFile)
 	outFile.close();
 }
 
-void SplitFile(std::string fileName, size_t fileSize = 3500*1024*1024)
+void SplitFile(std::string fileName, size_t fileSize = 3500)
 {
+	fileSize *= 1024 * 1024;
 	//make a buffer to read chunks into
 	char data[512 * 1024];
 
@@ -146,10 +147,24 @@ int main(int argc, char **argv)
 	switch (argv[1][1])
 	{
 	case 'j':
+		std::cout << "Joining files from " << argv[2] << ", wait one moment please..." << std::endl;
 		JoinFiles(argv[2]);
+		std::cout << "Files joined.\n";
 		break;
 	case 's':
-		SplitFile(argv[2]);
+	{
+		std::cout << "Splitting " << argv[2] << " into multiple smaller files, wait one moment please..." << std::endl;
+		std::string split = argv[1];
+		if (split.size() == 2) SplitFile(argv[2]);
+		else
+		{
+			split.erase(0, 2);
+			size_t mb = std::stoi(split);
+			SplitFile(argv[2], mb);
+		}
+
+		std::cout << "Files split.\n";
+	}
 		break;
 	default:
 		Usage(argv[0]);
