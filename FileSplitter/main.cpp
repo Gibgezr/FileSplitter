@@ -1,3 +1,10 @@
+/*
+	FileSplitter by Darren Reid.
+
+	Not using rdbuf()->pubsetbuf() because manual buffering is 10x faster according to:
+	https://stackoverflow.com/questions/12997131/stdfstream-buffering-vs-manual-buffering-why-10x-gain-with-manual-buffering
+*/
+
 #include<iostream>
 #include<fstream>
 #include<string>
@@ -6,18 +13,19 @@
 void Usage(char *argv0)
 {
 	std::cout << "USAGE:\n";
-	std::cout << argv0 << " <switches> <filename>\n";
+	std::cout << argv0 << " <switches> <filename> <optional output directory path>\n";
 	std::cout << "Where switches is one of:\n";
 	std::cout << "-s (split the file into 3.5 GB chunks)\n";
 	std::cout << "-sX (split the file into X MB chunks)\n";
 	std::cout << "-j (join the file)\n";
 	std::cout << "And filename is either the file to be split,\n";
-	std::cout << "Or the .rip file to be joined togethor.\n\n";
+	std::cout << "Or the .rip file to be joined togethor.\n";
+	std::cout << "And the optional output directory path is where you want the files written.\n\n";
 
 	exit(-1);
 }
 
-void JoinFiles(std::string firstFile)
+void JoinFiles(std::string firstFile, std::string outputDir)
 {
 	//make a buffer to read chunks into
 	char data[512 * 1024];
@@ -35,12 +43,12 @@ void JoinFiles(std::string firstFile)
 	{
 		std::string f;
 		std::getline(ripFile, f);
-		fileNames.push_back(f);
+		if(f.size() != 0) fileNames.push_back(f);
 	}
 	
 	ripFile.close();
 
-	auto outFile = std::fstream(fileNames[0], std::ios::out | std::ios::binary | std::ios::trunc);
+	auto outFile = std::fstream(outputDir+fileNames[0], std::ios::out | std::ios::binary | std::ios::trunc);
 	for (int i = 1; i < fileNames.size(); ++i)
 	{
 		auto inFile = std::fstream(fileNames[i], std::ios::in | std::ios::binary);
@@ -65,7 +73,7 @@ void JoinFiles(std::string firstFile)
 			if (outFile.fail())
 			{
 				//Probably ran out of space
-				std::cout << "Error writing to file " << fileNames[0] << ".\nMaybe disk is full?\n";
+				std::cout << "Error writing to file " << outputDir + fileNames[0] << ".\nMaybe disk is full?\n";
 				outFile.close();
 				inFile.close();
 				exit(-10);
@@ -78,7 +86,7 @@ void JoinFiles(std::string firstFile)
 	outFile.close();
 }
 
-void SplitFile(std::string fileName, size_t fileSize = 3500)
+void SplitFile(std::string fileName, std::string outputDir, size_t fileSize = 3500)
 {
 	fileSize *= 1024 * 1024;
 	//make a buffer to read chunks into
@@ -92,7 +100,7 @@ void SplitFile(std::string fileName, size_t fileSize = 3500)
 		ripFileName += fileName[i];
 	}
 
-	auto ripFile = std::fstream(ripFileName + ".rip", std::ios::out);
+	auto ripFile = std::fstream(outputDir + ripFileName + ".rip", std::ios::out);
 
 	ripFile << fileName << "\n"; //first line is original file name
 
@@ -116,7 +124,7 @@ void SplitFile(std::string fileName, size_t fileSize = 3500)
 		if (counter < 10) outFileName += '0';
 		outFileName += std::to_string(counter);
 
-		auto outFile = std::fstream(outFileName, std::ios::out | std::ios::binary | std::ios::trunc);
+		auto outFile = std::fstream(outputDir + outFileName, std::ios::out | std::ios::binary | std::ios::trunc);
 		counter++;
 
 		ripFile << outFileName << "\n"; //add this output file to the rip file listing
@@ -140,7 +148,7 @@ void SplitFile(std::string fileName, size_t fileSize = 3500)
 			if (outFile.fail())
 			{
 				//Probably ran out of space
-				std::cout << "Error writing to file " << outFileName << ".\nMaybe disk is full?\n";
+				std::cout << "Error writing to file " << outputDir + outFileName << ".\nMaybe disk is full?\n";
 				outFile.close();
 				inFile.close();
 				ripFile.close();
@@ -161,25 +169,33 @@ void SplitFile(std::string fileName, size_t fileSize = 3500)
 
 int main(int argc, char **argv)
 {
-	if (argc != 3) Usage(argv[0]);
+	if (argc != 3 && argc != 4) Usage(argv[0]);
 	if(argv[1][0] != '-') Usage(argv[0]);
+	std::string outputDir = "";
+	if (argc == 4)
+	{
+		outputDir = argv[3];
+		char endChar = outputDir[outputDir.size() - 1];
+		if (endChar != '\\' && endChar != '/') outputDir += '\\';
+	}
+
 	switch (argv[1][1])
 	{
 	case 'j':
 		std::cout << "Joining files from " << argv[2] << ", wait one moment please..." << std::endl;
-		JoinFiles(argv[2]);
+		JoinFiles(argv[2], outputDir);
 		std::cout << "Files joined.\n";
 		break;
 	case 's':
 	{
 		std::cout << "Splitting " << argv[2] << " into multiple smaller files, wait one moment please..." << std::endl;
 		std::string split = argv[1];
-		if (split.size() == 2) SplitFile(argv[2]);
+		if (split.size() == 2) SplitFile(argv[2], outputDir);
 		else
 		{
 			split.erase(0, 2);
 			size_t mb = std::stoi(split);
-			SplitFile(argv[2], mb);
+			SplitFile(argv[2], outputDir, mb);
 		}
 
 		std::cout << "Files split.\n";
